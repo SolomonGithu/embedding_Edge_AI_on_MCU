@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel='icon' href='/seeed_studio_favicon'>
+    <title>WebAI with XIAO ESP32S3</title>
+    <script src="/tfjs"></script>
+    <style>
+        body {
+            background: #FAF9F6;
+            font-family: Verdana, sans-serif;
+            text-align: center;
+        }
+
+        .header {
+            align-items: center;
+            margin-top: -15px;
+        }
+
+        #header_title {
+            float: left;
+        }
+
+        #header_seeed_studio_logo {
+            float: right;
+        }
+
+        .camera_feed {
+            border-radius: 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            margin: auto;
+            display: block;
+            width: 400px;
+            height: 400px;
+        }
+
+        .class_dropdown_select {
+            background-color: white;
+            border: thin solid #097969;
+            border-radius: 0.4em;
+            display: inline-block;
+            font: inherit;
+            line-height: 1.5em;
+            padding: 0.2em 3.5em 0.2em 1em;
+
+            margin: 0;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+
+            background-image:
+                linear-gradient(45deg, transparent 50%, gray 50%),
+                linear-gradient(135deg, gray 50%, transparent 50%),
+                linear-gradient(to right, #ccc, #ccc);
+            background-position:
+                calc(100% - 20px) center,
+                calc(100% - 15px) center,
+                calc(100% - 2.5em) center;
+            background-size:
+                5px 5px,
+                5px 5px,
+                1px 1.5em;
+            background-repeat: no-repeat;
+
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .button {
+            padding: 0.2em 1em;
+            font-size: inherit;
+            font-family: Verdana, sans-serif;
+            color: white;
+            line-height: 1.5em;
+            border-radius: 0.4em;
+            font-weight: 400;
+            display: inline-block;
+            cursor: pointer;
+            border: thin solid #097969;
+            background: #097969;
+            margin: auto;
+            width: auto;
+            box-sizing: border-box;
+        }
+
+        .log {
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div id="header_title">
+            <p style="font-size: 25px; color: #36454F;">Edge AI on MCU: Train and deploy ML model with XIAO ESP32S3</p>
+        </div>
+        <div id="header_seeed_studio_logo">
+            <img src="/seeed_studio_logo" alt="Seeed Studio logo" width="240" height="50">
+        </div>
+    </div>
+    <div style="clear: both;"></div> <!-- Easy fix for float issue of the camera feed :) -->
+
+    <p><span id="inference_results"></span></p>
+
+    <img id="camera_feed" class="camera_feed" src="/camera_feed">
+    <br>
+    <label for="class_dropdown_label">Select class: </label>
+    <select class="class_dropdown_select" id="class_dropdown_select" required>
+    </select>
+
+    <button id="capture" class="button">Capture image</button>
+    <button id="train" class="button">Train model</button>
+
+    <p>
+        <span id="image_counts_per_class_text"></span>
+        <canvas id="hiddenCanvas" width="224" height="224" style="display:none;"></canvas>
+        <p style="font-family: Verdana, sans-serif; color: #36454F;"><b>Training Logs</b>
+    </p>
+    <div id="log" class="log"></div>
+
+    <script>
+        window.onload = function () {
+            loadPage();
+            loadModel();
+        };
+
+        let inference_results = document.getElementById('inference_results');
+        let camera_feed_Element = document.getElementById('camera_feed');
+        let class_dropdown_select = document.getElementById('class_dropdown_select');
+        let image_counts_per_class_text = document.getElementById('image_counts_per_class_text');
+        let canvas = document.getElementById('hiddenCanvas');
+        let ctx = canvas.getContext('2d');
+        let log_Element = document.getElementById('log');
+
+        const esp32S3_ip_address = '********'; // change this to the ESP32S3's IP address
+        let model = null;
+        let model_loaded_from_SD = false;
+        const inference_interval_ms = 500; // in ms
+
+        const IMAGE_WIDTH = 96;
+        const IMAGE_HEIGHT = 96;
+        const IMAGE_CHANNELS = 3; // use 1 for grayscale, 3 for RGB
+        let class_labels = ['person', 'no_person']; // SHOULD BE SAME SIZE AS image_counts_per_class
+        let image_counts_per_class = [0, 0]; // image counter for each class. SHOULD BE SAME SIZE AS class_labels
+        const NUM_CLASSES = class_labels.length;
+        let capturedImages = [];
+        let labels = [];
+
+        const no_epochs = 20;
+        const batchsize = 8;
+
+        function loadPage() {
+            load_class_dropdown_items();
+            load_image_counts_per_class_text();
+        }
+        function load_class_dropdown_items() {
+            class_dropdown_select.innerHTML = "";
+
+            //class_dropdown_select.options[class_dropdown_select.options.length] = new Option(class_labels);
+            for (var x = 0; x < class_labels.length; x++) {
+                //option text		  //option value
+                class_dropdown_select.options[class_dropdown_select.options.length] = new Option(class_labels[x], x);
+            }
+        }
+        function load_image_counts_per_class_text() {
+            let html_image_counts_per_class_pStart = '<p> Captured images counts per class:'
+            let html_image_counts_per_class_text = '';
+            for (var x = 0; x < class_labels.length; x++) {
+                html_image_counts_per_class_text += ' ' + class_labels[x] + '= <span id="count' + x + '">' + image_counts_per_class[x] + '</span>';
+                if (class_labels.length - x !== 1)
+                    html_image_counts_per_class_text += ',';
+                else if (class_labels.length - x === 1)
+                    html_image_counts_per_class_text += '.';
+            }
+            let html_image_counts_per_class_pEnd = '</p>';
+
+            image_counts_per_class_text.innerHTML = html_image_counts_per_class_pStart + html_image_counts_per_class_text + html_image_counts_per_class_pEnd;
+        }
+
+        document.getElementById('capture').addEventListener('click', () => {
+            let selectedClass = parseInt(class_dropdown_select.value);
+            ctx.drawImage(camera_feed_Element, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+            let imageData = ctx.getImageData(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+
+            let imgTensor = tf.browser.fromPixels(imageData, IMAGE_CHANNELS)
+                .div(255)
+                .reshape([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS]);
+
+            capturedImages.push(imgTensor);
+            labels.push(selectedClass);
+
+            image_counts_per_class[selectedClass]++;
+            load_image_counts_per_class_text();
+        })
+
+        async function loadModel() { // load model files from the ESP32S3  
+            try {
+                model = await tf.loadLayersModel('/model.json');
+                model_loaded_from_SD = true;
+
+                /* From experimentation, freezing all layers gives just 34 trainable parameters resulting to a poor training
+                // Freeze all layers except the last one
+                for (let i = 0; i < model.layers.length - 1; i++) {
+                    model.layers[i].trainable = false;
+                }
+                */
+                // compile the model to allow retraining it
+                model.compile({
+                    optimizer: tf.train.adam(0.001),
+                    loss: 'categoricalCrossentropy',
+                    metrics: ['accuracy']
+                });
+
+                console.log("Loaded model summary:");
+                console.log(model.summary());
+            } catch (error) {
+                model_loaded_from_SD = false;
+                console.error("Failed to load model:", error);
+            }
+
+            model_loaded_from_SD? startContinuousInference(model): console.log("Continuous inference will not start!");
+        }
+        
+        async function trainModel() {
+            if (capturedImages.length === 0) {
+                log("No images captured yet.");
+                return;
+            }
+
+            log("Building dataset...");
+            const xs = tf.stack(capturedImages);
+            const ys = tf.oneHot(tf.tensor1d(labels, 'int32'), NUM_CLASSES);
+
+            if (!model_loaded_from_SD){ // create a model if none was loaded from the SD card
+                log("Creating model...");
+                
+                model = tf.sequential();
+                model.add(tf.layers.conv2d({
+                    inputShape: [IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS],
+                    kernelSize: 3,
+                    filters: 8,
+                    activation: 'relu'
+                }));
+                model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+                model.add(tf.layers.flatten());
+                model.add(tf.layers.dense({ units: 16, activation: 'relu' }));
+                model.add(tf.layers.dense({ units: NUM_CLASSES, activation: 'softmax' }));
+                       
+                /* From experimentation, freezing all layers gives just 34 trainable parameters resulting to a poor training
+                // Freeze all layers except the last one
+                for (let i = 0; i < model.layers.length - 1; i++) {
+                    model.layers[i].trainable = false;
+                }
+                */
+                // Compile the model to allow retraining it
+                model.compile({
+                    optimizer: tf.train.adam(0.001),
+                    loss: 'categoricalCrossentropy',
+                    metrics: ['accuracy']
+                });
+
+                console.log("Created model summary:");
+                console.log(model.summary());
+            }
+
+            // Train the model
+            log("Training model...");
+            await model.fit(xs, ys, {
+                epochs: no_epochs,
+                batchSize: batchsize,
+                callbacks: {
+                    onEpochEnd: (epoch, logs) => {
+                        log(`Epoch ${epoch + 1}: loss=${logs.loss.toFixed(4)}, acc=${(logs.acc * 100).toFixed(2)}%`);
+                    }
+                }
+            });
+
+            log("Training complete!");
+            
+            // Send the model to the ESP32 and it will be saved to an SD card
+            await model.save('http://' + esp32S3_ip_address + '/save_model');
+
+            startContinuousInference(model);
+        }
+
+        document.getElementById('train').addEventListener('click', trainModel);
+
+        function startContinuousInference(model) {
+            log("Starting inference...");
+
+            setInterval(() => {
+                ctx.drawImage(camera_feed_Element, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+                let imageData = ctx.getImageData(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+                let imgTensor = tf.browser.fromPixels(imageData, IMAGE_CHANNELS).div(255).reshape([1, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS]);
+
+                let prediction = model.predict(imgTensor);
+                prediction.array().then(arr => {
+                    const probs = arr[0];
+                    log(`Inference → person: ${(probs[0] * 100).toFixed(1)}%, no_person: ${(probs[1] * 100).toFixed(1)}%`);
+                    // display the same on HTML page
+                    let inference_results_forHTML = `Classification → person: ${(probs[0] * 100).toFixed(1)}%, no_person: ${(probs[1] * 100).toFixed(1)}%`;
+                    inference_results.innerText = inference_results_forHTML;
+                });
+            }, inference_interval_ms); // in ms
+        }
+
+        function log(msg) {
+            console.log(msg);
+            log_Element.innerText += msg + "\n";
+            log_Element.scrollTop = log_Element.scrollHeight;
+        }
+    </script>
+</body>
+</html>
