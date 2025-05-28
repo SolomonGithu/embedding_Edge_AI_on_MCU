@@ -16,9 +16,7 @@ The tiny [XIAO ESP32S3 Sense](https://wiki.seeedstudio.com/xiao_esp32s3_getting_
 
 Note that the project can also be run on other ESP32 boards but the camera and SD card configurations will need to be updated. To change the camera model, select the correct one in the code [XIAO_ESP32S3_Edge_AI.ino](XIAO_ESP32S3_Edge_AI/XIAO_ESP32S3_Edge_AI.ino). Identify the pin details of your board's SD card interface and in the Arduino sketch set the correct GPIO number for chip select pin in ```SD.begin()``` e.g ```SD.begin(21)``` if the chip select is connected to GPIO 21.
 
-Below is a video demonstrating how to setup and train models.
-
-[![Demonstration](http://img.youtube.com/vi/UVWmFLhP9X4/0.jpg)](http://www.youtube.com/watch?v=UVWmFLhP9X4 "Embedding ML training on MCU")
+I recorded a short video demonstrating how to setup and train models: [YouTube link](https://youtu.be/UVWmFLhP9X4)
 
 ## Quick Start
 
