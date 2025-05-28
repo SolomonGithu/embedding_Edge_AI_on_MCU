@@ -22,7 +22,7 @@ I recorded a short video demonstrating how to setup and train models: [YouTube l
 
 - On your PC, ensure that you have installed Arduino IDE, [ESPAsyncWebServer library](https://github.com/ESP32Async/ESPAsyncWebServer), and the esp32 board.
 - Open the Arduino sketch [XIAO_ESP32S3_Edge_AI.ino](XIAO_ESP32S3_Edge_AI/XIAO_ESP32S3_Edge_AI.ino) and replace both ```wifi_SSID``` and ```wifi_password``` values with the Wi-Fi network name and password that you want the XIAO board to connect to. You can also define the Access Point (Wi-Fi hotspot) credentials with the variables ```ap_SSID``` and ```ap_password```.
-- If you intend to upload the sketch to a XIAO ESP32S3 (default), ensure that ```CAMERA_MODEL_XIAO_ESP32S3``` is defined (not commented).
+- If you intend to upload the sketch to a XIAO ESP32S3 Sense (default), ensure that ```CAMERA_MODEL_XIAO_ESP32S3``` is defined (not commented).
 - On the Arduino IDE 'Tools' setting, ensure 'PSRAM' is set to 'OPI PSRAM'. Also select the correct board, 'XIAO_ESP32S3' for this project.
 - Connect the XIAO ESP32S3 Sense to your PC and upload the sketch. **Ensure that a 2.4 GHz antenna is connected to the board** and open a serial interface such as the [Serial monitor](https://docs.arduino.cc/software/ide-v2/tutorials/ide-v2-serial-monitor/) (set the baud rate to 115200). Next, copy the IP address that the board has been assigned. Disconnect the board from your PC after copying the IP address.
 
