@@ -37,13 +37,15 @@ I recorded a short video demonstrating how to setup and train models: [YouTube l
 
 ## Train and run models
 
-Once the XIAO ESP32S3 Sense (or other ESP board) has been programmed, SD card inserted and powered, it will connect to the set Wi-Fi network or create an Access Point. If the board is on AP mode, connect to the hotspot. Afterwards, use a PC or a mobile phone to access the Web UI through a browser by entering the IP Address of the board in the URL section. The web UI (completely served by the XIAO ESP32S3) shows live camera feed, buttons to capture images for the selected class and buttons to train an image classification model. The training and inference logs are also shown on the UI.
+Once the XIAO ESP32S3 Sense (or other ESP board) has been programmed, SD card inserted and powered, it will connect to the set Wi-Fi network or create an Access Point. If the board is on AP mode, connect to the hotspot. Afterwards, use a PC or a mobile phone to access the Web UI through a browser by entering the IP Address of the board in the URL section. The web UI (completely served by the XIAO ESP32S3 Sense) shows live camera feed, buttons to capture images for the selected class and buttons to train an image classification model. The training and inference logs are also shown on the UI.
+
+If ```model.json``` and ```model.weights.bin``` files exist on the root of the SD card, the model will be loaded automatically and inference will start on the browser when a client accesses the Web UI. If no model is found on the SD card, the user needs to capture images for each class and train a model.
 
 ![Web AI page](media/Web_AI_page.png)
 
 > **Note:** You can easily update the class labels using the ```class_labels``` variable in the [index.html](web_ai/index.html) file. Ensure the size of the ```class_labels``` array matches with ```image_counts_per_class```! You can add more classes as well.
 
-Place an object in front of the camera and capture images of the respective class. Do the same process for other classes which can be set by using the dropdown. 
+Place an object in front of the ESP camera and capture images of the respective class. Do the same process for other classes which can be set by using the dropdown. 
 
 ![Capturing images](media/Web_AI_page_capturing_images.png)
 
@@ -51,13 +53,11 @@ Once you have captured a considerable number of images, click 'Train model'. A s
 
 ![Training a model](media/Web_AI_page_model_training.png)
 
-If ```model.json``` and ```model.weights.bin``` files exist on the root of the SD card, the model will be loaded automatically and inference will start on the browser when a client accesses the Web UI. If no model is found on the SD card, the user needs to capture images for each class and train a model.
-
 ![Training done](media/Web_AI_page_model_training_done.png)
 
 ![Inference](media/Web_AI_page_inference.png)
 
-You can also access the user interface using a mobile browser. In my tests, I trained upto 50 images on both PC and mobile browsers and the training was successful.
+You can also access the user interface using a mobile phone's browser. In my tests, I trained upto 50 images on both PC and mobile browsers and the training was successful.
 
 ![Inference on mobile](media/Web_AI_page_inference_on_mobile.png)
 
